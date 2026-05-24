@@ -1,0 +1,28 @@
+services:
+  # 1. Backend Web Service (FastAPI)
+  - type: web
+    name: equisight-api
+    runtime: python
+    plan: free
+    buildCommand: "pip install -r backend/requirements.txt"
+    startCommand: "uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false # Paste your Gemini API key in the Render dashboard
+      - key: DATABASE_URL
+        sync: false # Paste your Neon PostgreSQL connection string here
+      - key: GEMINI_MODEL
+        value: gemini-3.5-flash
+
+  # 2. Frontend Static Site (Vite React)
+  - type: web
+    name: equisight-dashboard
+    runtime: static
+    buildCommand: "cd frontend && npm install && npm run build"
+    staticPublishPath: frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: equisight-api
+          property: host
