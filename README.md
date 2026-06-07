@@ -1,4 +1,3 @@
-```markdown
 # EquiSight: Autonomous Market Intelligence Dashboard
 
 [![Live Deployment](https://img.shields.io/badge/Live_Demo-Render-46E3B7?style=for-the-badge&logo=render)](https://equisight-dashboard.onrender.com/)
