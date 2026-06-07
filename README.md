@@ -1,8 +1,13 @@
+```markdown
 # EquiSight: Autonomous Market Intelligence Dashboard
 
-EquiSight is a project-level, production-ready, full-stack application that ingests equity data from Yahoo Finance, performs AI-powered fundamental and sentiment analysis (using Gemini LLM reasoning layer), and visualizes the structured intelligence in a premium glassmorphic dashboard.
+[![Live Deployment](https://img.shields.io/badge/Live_Demo-Render-46E3B7?style=for-the-badge&logo=render)](https://equisight-dashboard.onrender.com/)
 
-## Folder Structure
+EquiSight is a production-ready, full-stack market intelligence platform. It dynamically ingests equity data from Yahoo Finance, executes AI-driven fundamental and sentiment analysis via a Gemini LLM reasoning layer, and surfaces structured financial intelligence through a high-performance, glassmorphic React dashboard.
+
+---
+
+## 📂 Architecture & Folder Structure
 
 ```text
 market_intelligence_pipeline/
@@ -24,57 +29,68 @@ market_intelligence_pipeline/
 │           ├── WatchlistManager.jsx # CRUD pills & watchlist adding
 │           └── PipelineControl.jsx  # Logs viewer & execution trigger
 └── README.md
+
 ```
 
 ---
 
-## Getting Started
+## 🚀 Getting Started
 
 ### 1. Setup Backend (Python FastAPI)
 
-The backend runs on Python 3.10+ and uses SQLite.
+The backend runs on Python 3.10+ and utilizes SQLite for lightweight, zero-config state management.
 
-1. Navigate to the project root directory and activate your virtual environment:
-   ```bash
-   source .venv/bin/activate
-   ```
-2. Upgrade/install dependencies using the backend's `requirements.txt`:
-   ```bash
-   pip install -r backend/requirements.txt
-   ```
-3. Start the FastAPI server on port 8000:
-   ```bash
-   export GEMINI_API_KEY="your-gemini-api-key"   # Optional: falls back to local mocks if not provided
-   uvicorn backend.main:app --reload --port 8000
-   ```
-   *Note: If no API key is specified, EquiSight runs in a robust mock offline mode generating realistic financial calculations locally so you can test all operations for free!*
+Navigate to the project root directory and activate your virtual environment:
 
-4. You can access the API Swagger docs directly at `http://localhost:8000/docs`.
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+
+```
+
+Install the backend dependencies:
+
+```bash
+pip install -r backend/requirements.txt
+
+```
+
+Configure your environment variables by creating a `.env` file in the `backend/` directory:
+
+```bash
+echo 'GEMINI_API_KEY="your-gemini-api-key"' > backend/.env
+
+```
+
+*(Note: If no API key is provided, EquiSight gracefully degrades into a Zero-Cost Local Development Mode, generating deterministic financial mocks so you can evaluate the platform's UI/UX without consuming tokens.)*
+
+Start the FastAPI server:
+
+```bash
+uvicorn backend.main:app --reload --port 8000
+
+```
+
+*You can access the interactive Swagger API documentation directly at `http://localhost:8000/docs`.*
 
 ### 2. Setup Frontend (Vite + React)
 
-The frontend is a single-page web dashboard styled with high-performance Vanilla CSS (dark-theme glassmorphism and micro-animations).
+The frontend is a single-page web dashboard optimized with high-performance Vanilla CSS (dark-theme glassmorphism and micro-animations).
 
-1. Open a new terminal window, navigate to the `frontend/` directory:
-   ```bash
-   cd frontend
-   ```
-2. Install npm packages (if you haven't already):
-   ```bash
-   npm install
-   ```
-3. Start the Vite React development server:
-   ```bash
-   npm run dev
-   ```
-4. Open your browser and navigate to the local URL (usually `http://localhost:5173`).
+Open a new terminal window, navigate to the frontend directory, and install the Node packages:
 
----
+```bash
+cd frontend
+npm install
 
-## Key Features
+```
 
-1. **Dashboard Overview Grid**: View the latest growth scores, sentiment status, and key financial ratios (P/E, YoY Growth, Debt/Equity) at a glance.
-2. **Watchlist Monitor**: Live add and remove tickers (e.g. `TCS.NS`, `RELIANCE.NS`, `INFY.NS`). The backend queries Yahoo Finance data dynamically.
-3. **Execution Console**: Click "Trigger Watchlist Analysis" to run the background agent pipeline. A live scrollable terminal in the UI displays real-time execution logs from the server.
-4. **SVG Historical Sparkline**: Every stock card plots a custom SVG trend line representing the ticker's historical growth scores across multiple runs, letting you monitor trends over time.
-5. **Detailed Insight Inspection**: Click on any stock card to open an interactive modal with full metrics, Yahoo Finance news headlines, and the detailed generative analysis summary.
+Boot up the Vite development server:
+
+```bash
+npm run dev
+
+```
+
+*The dashboard will automatically launch in your browser, typically at `http://localhost:5173`.*
+
