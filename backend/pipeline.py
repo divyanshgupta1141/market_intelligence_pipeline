@@ -118,6 +118,7 @@ def fetch_financial_data(ticker_symbol: str) -> Optional[Dict[str, Any]]:
 # 2. LLM Reasoning Layer
 def analyze_with_llm(ticker_data: Dict[str, Any], api_key: str, model: str = DEFAULT_MODEL) -> Optional[Dict[str, Any]]:
     """Send financial metrics to Gemini API for equity analysis."""
+    import time
     ticker = ticker_data["ticker"]
     logger.info(f"Running agentic analysis for {ticker}...")
 
@@ -150,38 +151,68 @@ def analyze_with_llm(ticker_data: Dict[str, Any], api_key: str, model: str = DEF
         logger.warning(f"Using fallback Mock LLM response for {ticker} (no valid Gemini API key provided).")
         return generate_mock_analysis(ticker_data)
 
-    try:
-        url = GEMINI_URL_TEMPLATE.format(model=model, api_key=api_key)
+    payload = {
+        "systemInstruction": {
+            "parts": [{"text": system_prompt}]
+        },
+        "contents": [
+            {"role": "user", "parts": [{"text": user_prompt}]}
+        ],
+        "generationConfig": {
+            "responseMimeType": "application/json",
+            "temperature": 0.1
+        }
+    }
+
+    # Model fallback list to recover from 503 or model unavailability
+    models_to_try = [model]
+    if model != "gemini-1.5-flash":
+        if "3.5" in model:
+            models_to_try.append("gemini-2.5-flash")
+            models_to_try.append("gemini-1.5-flash")
+        elif "2.5" in model:
+            models_to_try.append("gemini-1.5-flash")
+
+    last_exception = None
+    for attempt_model in models_to_try:
+        url = GEMINI_URL_TEMPLATE.format(model=attempt_model, api_key=api_key)
         headers = {"Content-Type": "application/json"}
         
-        payload = {
-            "systemInstruction": {
-                "parts": [{"text": system_prompt}]
-            },
-            "contents": [
-                {"role": "user", "parts": [{"text": user_prompt}]}
-            ],
-            "generationConfig": {
-                "responseMimeType": "application/json",
-                "temperature": 0.1
-            }
-        }
+        # Attempt up to 3 retries per model for transient errors (5xx, timeouts)
+        for attempt in range(1, 4):
+            try:
+                logger.info(f"Sending LLM request for {ticker} using {attempt_model} (attempt {attempt}/3)...")
+                response = requests.post(url, headers=headers, json=payload, timeout=20)
+                response.raise_for_status()
 
-        response = requests.post(url, headers=headers, json=payload, timeout=30)
-        response.raise_for_status()
+                response_data = response.json()
+                raw_content = response_data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                
+                parsed_result = parse_json_safely(raw_content)
+                if parsed_result:
+                    return parsed_result
+                else:
+                    raise ValueError(f"Could not parse valid JSON structure from content: {raw_content}")
 
-        response_data = response.json()
-        raw_content = response_data["candidates"][0]["content"]["parts"][0]["text"].strip()
-        
-        parsed_result = parse_json_safely(raw_content)
-        if parsed_result:
-            return parsed_result
-        else:
-            raise ValueError(f"Could not parse valid JSON structure from content: {raw_content}")
+            except requests.exceptions.HTTPError as e:
+                status_code = e.response.status_code if e.response is not None else 500
+                logger.warning(f"HTTP Error {status_code} on {attempt_model} (attempt {attempt}/3): {e}")
+                last_exception = e
+                if status_code < 500 and status_code != 429:
+                    # Non-retryable client error (like 404, 400), try fallback model
+                    break
+                time.sleep(2 ** attempt)
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+                logger.warning(f"Network error on {attempt_model} (attempt {attempt}/3): {e}")
+                last_exception = e
+                time.sleep(2 ** attempt)
+            except Exception as e:
+                logger.warning(f"Error on {attempt_model} (attempt {attempt}/3): {e}")
+                last_exception = e
+                break
 
-    except Exception as e:
-        logger.error(f"Error during LLM reasoning layer for {ticker}: {e}. Falling back to mock analysis.", exc_info=True)
-        return generate_mock_analysis(ticker_data)
+    logger.error(f"All LLM reasoning models failed for {ticker}. Last error: {last_exception}. Falling back to mock analysis.")
+    return generate_mock_analysis(ticker_data)
 
 
 def parse_json_safely(content: str) -> Optional[Dict[str, Any]]:
