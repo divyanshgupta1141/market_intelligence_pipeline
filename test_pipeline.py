@@ -97,6 +97,63 @@ class TestMarketIntelligencePipeline(unittest.TestCase):
         self.assertTrue(1 <= mock_result["growth_score"] <= 100)
         self.assertIn(mock_result["sentiment"], ["Bullish", "Bearish", "Neutral"])
 
+    def test_fetch_financial_data_yfinance_rate_limit_fallback(self):
+        # Setup cache database record
+        db_path = "test_market_intelligence.db"
+        if os.path.exists(db_path):
+            os.remove(db_path)
+            
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS asset_analysis (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticker TEXT NOT NULL,
+                date TEXT NOT NULL,
+                growth_score INTEGER NOT NULL,
+                sentiment TEXT NOT NULL,
+                forward_pe REAL,
+                revenue_growth REAL,
+                debt_to_equity REAL,
+                headlines TEXT,
+                raw_analysis TEXT NOT NULL
+            )
+        """)
+        # Seed cache for TEST_STOCK.NS
+        cursor.execute("""
+            INSERT INTO asset_analysis (ticker, date, growth_score, sentiment, forward_pe, revenue_growth, debt_to_equity, headlines, raw_analysis)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            "TEST_STOCK.NS", "2026-06-08 12:00:00", 80, "Bullish", 12.5, 0.18, 45.0, 
+            '["Test headline 1", "Test headline 2"]', '{"growth_score": 80}'
+        ))
+        conn.commit()
+        conn.close()
+        
+        # Modify pipeline.DB_FILE to point to our test db path temporarily
+        import pipeline
+        original_db = pipeline.DB_FILE
+        pipeline.DB_FILE = db_path
+        
+        try:
+            import unittest.mock as mock
+            with mock.patch("yfinance.Ticker") as mock_ticker:
+                mock_ticker.side_effect = Exception("Rate limited mock exception")
+                
+                # Fetch financial data
+                result = pipeline.fetch_financial_data("TEST_STOCK.NS")
+                
+                self.assertIsNotNone(result)
+                self.assertEqual(result["ticker"], "TEST_STOCK.NS")
+                self.assertEqual(result["forward_pe"], 12.5)
+                self.assertEqual(result["revenue_growth"], 0.18)
+                self.assertEqual(result["debt_to_equity"], 45.0)
+                self.assertEqual(result["news_headlines"], ["Test headline 1", "Test headline 2"])
+        finally:
+            pipeline.DB_FILE = original_db
+            if os.path.exists(db_path):
+                os.remove(db_path)
+
 
 if __name__ == "__main__":
     unittest.main()

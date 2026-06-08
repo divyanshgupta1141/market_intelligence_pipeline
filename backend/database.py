@@ -282,3 +282,43 @@ def get_ticker_history(ticker: str) -> List[Dict[str, Any]]:
     conn.close()
     
     return [{"date": r["date"], "growth_score": r["growth_score"], "sentiment": r["sentiment"]} for r in rows]
+
+def get_latest_analysis_for_ticker(ticker: str) -> Optional[Dict[str, Any]]:
+    """Retrieve the single latest analysis record for a given ticker."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    placeholder = "%s" if IS_POSTGRES else "?"
+    try:
+        cursor.execute(f"""
+            SELECT * FROM asset_analysis 
+            WHERE ticker = {placeholder} 
+            ORDER BY date DESC 
+            LIMIT 1
+        """, (ticker.upper().strip(),))
+        rows = fetch_all_dict(cursor)
+        if not rows:
+            return None
+        r = rows[0]
+        import json
+        headlines = []
+        if r.get("headlines"):
+            try:
+                headlines = json.loads(r["headlines"])
+            except Exception:
+                headlines = [h.strip() for h in r["headlines"].split("\n") if h.strip()]
+        return {
+            "ticker": r["ticker"],
+            "date": r["date"],
+            "growth_score": r["growth_score"],
+            "sentiment": r["sentiment"],
+            "forward_pe": r["forward_pe"],
+            "revenue_growth": r["revenue_growth"],
+            "debt_to_equity": r["debt_to_equity"],
+            "headlines": headlines,
+            "key_insight": r.get("key_insight")
+        }
+    except Exception as e:
+        logger.error(f"Error fetching latest analysis for ticker {ticker}: {e}", exc_info=True)
+        return None
+    finally:
+        conn.close()
