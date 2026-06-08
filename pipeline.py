@@ -219,6 +219,7 @@ def analyze_with_llm(ticker_data: Dict[str, Any], api_key: str, model: str = DEF
         or None if reasoning fails.
     """
     import time
+    api_key = api_key.strip()
     ticker = ticker_data["ticker"]
     logger.info(f"Running agentic analysis for {ticker}...")
 
@@ -299,7 +300,8 @@ def analyze_with_llm(ticker_data: Dict[str, Any], api_key: str, model: str = DEF
 
             except requests.exceptions.HTTPError as e:
                 status_code = e.response.status_code if e.response is not None else 500
-                logger.warning(f"HTTP Error {status_code} on {attempt_model} (attempt {attempt}/3): {e}")
+                err_body = e.response.text if e.response is not None else ""
+                logger.warning(f"HTTP Error {status_code} on {attempt_model} (attempt {attempt}/3): {e}. Response details: {err_body}")
                 last_exception = e
                 if status_code < 500 and status_code != 429:
                     # Non-retryable client error (like 404, 400), try fallback model
