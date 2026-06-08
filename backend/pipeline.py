@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import re
+import time
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 import requests
@@ -13,7 +14,7 @@ from backend.database import store_analysis_record, get_latest_analysis_for_tick
 logger = logging.getLogger("market_intelligence.pipeline")
 
 DEFAULT_MODEL = "gemini-3.5-flash"
-GEMINI_URL_TEMPLATE = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+GEMINI_URL_TEMPLATE = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 # 1. Ingestion Layer
 def fetch_financial_data(ticker_symbol: str) -> Optional[Dict[str, Any]]:
@@ -175,14 +176,17 @@ def analyze_with_llm(ticker_data: Dict[str, Any], api_key: str, model: str = DEF
 
     last_exception = None
     for attempt_model in models_to_try:
-        url = GEMINI_URL_TEMPLATE.format(model=attempt_model, api_key=api_key)
-        headers = {"Content-Type": "application/json"}
+        url = GEMINI_URL_TEMPLATE.format(model=attempt_model)
+        headers = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": api_key
+        }
         
         # Attempt up to 3 retries per model for transient errors (5xx, timeouts)
         for attempt in range(1, 4):
             try:
                 logger.info(f"Sending LLM request for {ticker} using {attempt_model} (attempt {attempt}/3)...")
-                response = requests.post(url, headers=headers, json=payload, timeout=20)
+                response = requests.post(url, headers=headers, json=payload, timeout=60)
                 response.raise_for_status()
 
                 response_data = response.json()
@@ -298,8 +302,13 @@ def run_pipeline_for_watchlist(watchlist: List[str]) -> Dict[str, Any]:
     fail_count = 0
     results = []
 
-    for ticker in watchlist:
+    for idx, ticker in enumerate(watchlist):
         try:
+            # Pace requests to yfinance to prevent rate limits
+            if idx > 0:
+                logger.info("Pacing ingestion requests: Sleeping for 2 seconds...")
+                time.sleep(2)
+
             # 1. Fetch Data
             ticker_data = fetch_financial_data(ticker)
             if not ticker_data:
