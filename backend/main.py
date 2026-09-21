@@ -67,12 +67,8 @@ def startup_event():
     init_and_migrate_db()
     logger.info("FastAPI Application Startup Complete.")
 
-# Models
-class TickerRequest(BaseModel):
-    ticker: str
-
-class PipelineRunRequest(BaseModel):
-    tickers: Optional[List[str]] = None
+# Models & Schemas
+from backend.schemas import TickerRequest, PipelineRunRequest
 
 # Endpoints
 @app.get("/api/watchlist", response_model=List[str])

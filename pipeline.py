@@ -196,6 +196,13 @@ def fetch_financial_data(ticker_symbol: str) -> Optional[Dict[str, Any]]:
         "news_headlines": headlines
     }
 
+    # Defensive boundary validation using Pydantic v2 schema
+    try:
+        from schemas import FinancialExtraction
+        data = FinancialExtraction.model_validate(data).model_dump()
+    except Exception as e:
+        logger.warning(f"Data boundary validation notice for {ticker_symbol}: {e}")
+
     logger.info(
         f"Successfully fetched data for {ticker_symbol} "
         f"(Forward P/E: {forward_pe}, Revenue Growth: {revenue_growth}, "
@@ -294,7 +301,12 @@ def analyze_with_llm(ticker_data: Dict[str, Any], api_key: str, model: str = DEF
                 
                 parsed_result = parse_json_safely(raw_content)
                 if parsed_result:
-                    return parsed_result
+                    try:
+                        from schemas import LLMAnalysisResult
+                        return LLMAnalysisResult.model_validate(parsed_result).model_dump()
+                    except Exception as e:
+                        logger.warning(f"LLM output schema boundary notice for {ticker}: {e}")
+                        return parsed_result
                 else:
                     raise ValueError(f"Could not parse valid JSON structure from content: {raw_content}")
 
